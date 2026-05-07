@@ -1,4 +1,4 @@
-﻿using DevExpress.Mvvm;
+using DevExpress.Mvvm;
 using DevExpress.Mvvm.DataAnnotations;
 using DevExpress.Mvvm.Xpf;
 using DevExpress.Xpf.CodeView;
@@ -9,32 +9,28 @@ using System.Collections.ObjectModel;
 
 namespace SyntaxEditorExample.ViewModels {
     public class RulesViewModel : ViewModelBase {
+        protected ObservableCollection<MonacoThemeRule> rules;
 
-        public IMessageBoxService MessageBoxService => this.GetService<IMessageBoxService>();
+        public IMessageBoxService MessageBoxService => GetService<IMessageBoxService>();
 
-        protected ObservableCollection<MonacoThemeRule> _Rules;
         public ObservableCollection<MonacoThemeRule> Rules {
             get {
-                if (this._Rules == null) {
-                    this._Rules = new ObservableCollection<MonacoThemeRule>();
+                if(rules == null) {
+                    rules = new ObservableCollection<MonacoThemeRule>();
                 }
 
-                return this._Rules;
+                return rules;
             }
         }
 
         public string? RawRulesText {
-            get { return this.GetValue<string?>(); }
-            set { this.SetValue(value); }
+            get { return GetValue<string?>(); }
+            set { SetValue(value); }
         }
 
         public bool IsRawRulesMode {
-            get { return this.GetValue<bool>(); }
-            set { this.SetValue(value); }
-        }
-
-        private void ParseRawJS() {
-            
+            get { return GetValue<bool>(); }
+            set { SetValue(value); }
         }
 
         [Command]
@@ -44,24 +40,23 @@ namespace SyntaxEditorExample.ViewModels {
 
         [Command]
         public void ApplyJS() {
-            if (!MonacoRulesParser.TryParse(RawRulesText ?? string.Empty, out var parsed)) {
+            if(!MonacoRulesParser.TryParse(RawRulesText ?? string.Empty, out List<MonacoThemeRule> parsed)) {
                 MessageBoxService?.ShowMessage(
                     "Failed to parse rules. Please check the format.",
                     "Error",
                     MessageButton.OK,
                     MessageIcon.Error);
 
-                this.IsRawRulesMode = true;
+                IsRawRulesMode = true;
             }
 
             Rules.Clear();
             Rules.AddRange(parsed);
         }
 
-
         [Command]
         public void ApplyRulesChanges() {
-            if (IsRawRulesMode) {
+            if(IsRawRulesMode) {
                 ApplyJS();
             } else {
                 ApplyRules();

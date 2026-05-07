@@ -1,4 +1,4 @@
-﻿using DevExpress.Mvvm;
+using DevExpress.Mvvm;
 using DevExpress.Mvvm.DataAnnotations;
 using DevExpress.Xpf.CodeView;
 using SyntaxEditor;
@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace SyntaxEditorExample.ViewModels {
 	public class MainViewModel : ViewModelBase {
 
-		#region Constants
+		protected ObservableCollection<string> languages;
 
 		string MyLangMonarch = @"{
   defaultToken: ""invalid"",
@@ -142,7 +142,7 @@ namespace SyntaxEditorExample.ViewModels {
   ]
 }";
 
-		private const string testText = @"function test(x: number) {
+		const string testText = @"function test(x: number) {
 
     /* outer comment
         /* nested comment */
@@ -163,8 +163,6 @@ namespace SyntaxEditorExample.ViewModels {
 
     return null
 }";
-
-		#endregion Constants
 
 		public MainViewModel() {
 			Text = @"/*
@@ -210,24 +208,46 @@ namespace VS
 			RefreshLanguagesCommand = new AsyncCommand(RefreshLanguages, CanRefreshLanguages);
 		}
 
-		public IOpenFileDialogService OpenFileDialogService { get { return this.GetService<IOpenFileDialogService>(); } }
+		public IOpenFileDialogService OpenFileDialogService { get { return GetService<IOpenFileDialogService>(); } }
 
-		public ISaveFileDialogService SaveFileDialogService { get { return this.GetService<ISaveFileDialogService>(); } }
+		public ISaveFileDialogService SaveFileDialogService { get { return GetService<ISaveFileDialogService>(); } }
 
-		public ISyntaxEditorService SyntaxEditorService { get { return this.GetService<ISyntaxEditorService>(); } }
+		public ISyntaxEditorService SyntaxEditorService { get { return GetService<ISyntaxEditorService>(); } }
 
-		public IDialogService DialogService { get { return this.GetService<IDialogService>(); } }
+		public IDialogService DialogService { get { return GetService<IDialogService>(); } }
 
 		public string Text {
-			get { return this.GetValue<string>(); }
-			set { this.SetValue(value); }
+			get { return GetValue<string>(); }
+			set { SetValue(value); }
 		}
+
+        public ObservableCollection<string> Languages {
+            get {
+                if(languages == null) {
+                    languages = new ObservableCollection<string>();
+                }
+
+                return languages;
+            }
+        }
+
+        public IReadOnlyList<MonacoThemeRule> Rules {
+            get { return GetValue<IReadOnlyList<MonacoThemeRule>>(); }
+            set { SetValue(value); }
+        }
+
+        public string? Language {
+            get { return GetValue<string?>(); }
+            set { SetValue(value); }
+        }
+
+        public AsyncCommand RefreshLanguagesCommand { get; private set; }
 
 		[Command]
 		public void OpenFile() {
-			if (this.OpenFileDialogService.ShowDialog()) {
-				var file = this.OpenFileDialogService.Files.First();
-				this.Text = File.ReadAllText(Path.Combine(file.DirectoryName, file.Name));
+			if(OpenFileDialogService.ShowDialog()) {
+                IFileInfo file = OpenFileDialogService.Files.First();
+				Text = File.ReadAllText(Path.Combine(file.DirectoryName, file.Name));
 			}
 		}
 
@@ -237,74 +257,50 @@ namespace VS
 
 		[Command]
 		public void SaveFile() {
-			if (this.SaveFileDialogService.ShowDialog()) {
-				var file = this.SaveFileDialogService.File;
-				File.WriteAllText(Path.Combine(file.DirectoryName, file.Name), this.Text);
-				this.SyntaxEditorService.MarkAsSaved();
+			if(SaveFileDialogService.ShowDialog()) {
+                IFileInfo file = SaveFileDialogService.File;
+				File.WriteAllText(Path.Combine(file.DirectoryName, file.Name), Text);
+				SyntaxEditorService.MarkAsSaved();
 			}
 		}
 
 		public bool CanSaveFile() {
-			return this.SaveFileDialogService != null;
-		}
-
-
-		protected ObservableCollection<string> _Languages;
-		public ObservableCollection<string> Languages {
-			get {
-				if (this._Languages == null) {
-					this._Languages = new ObservableCollection<string>();
-				}
-
-				return this._Languages;
-			}
-		}
-
-		public IReadOnlyList<MonacoThemeRule> Rules {
-			get { return this.GetValue<IReadOnlyList<MonacoThemeRule>>(); }
-			set { this.SetValue(value); }
+			return SaveFileDialogService != null;
 		}
 
 		[Command]
 		public async void Initialize() {
 			await RefreshLanguages();
-			this.Language = this.Languages.Where(c => c.Contains("csharp")).FirstOrDefault();
+            Language = Languages.FirstOrDefault(c => c.Contains("csharp"));
 		}
 
-		public string? Language {
-			get { return this.GetValue<string?>(); }
-			set { this.SetValue(value); }
-		}
-
-		public AsyncCommand RefreshLanguagesCommand { get; private set; }
-
-		private async Task RefreshLanguages() {
-			if (this.SyntaxEditorService == null) {
+		async Task RefreshLanguages() {
+			if(SyntaxEditorService == null) {
 				throw new InvalidOperationException("SyntaxEditorService is not available.");
 			}
 
-			this.Languages.Clear();
-			var result = await this.SyntaxEditorService.GetLanguagesAsync();
-			if (result != null) {
-				this.Languages.AddRange(result);
+			Languages.Clear();
+            IReadOnlyCollection<string> result = await SyntaxEditorService.GetLanguagesAsync();
+			if(result != null) {
+				Languages.AddRange(result);
 			}
 		}
-		private bool CanRefreshLanguages() {
-			return this.SyntaxEditorService != null;
+		bool CanRefreshLanguages() {
+			return SyntaxEditorService != null;
 		}
 
 		[Command]
 		public void ChangeRules() {
 
-            if (this.DialogService == null) {
+            if(DialogService == null) {
                 throw new InvalidOperationException("DialogService is not available.");
             }
 
-			var vm = new RulesViewModel();
-            if (this.Rules != null)
-                vm.Rules.AddRange(this.Rules);
+            RulesViewModel vm = new RulesViewModel();
+            if(Rules != null)
+                vm.Rules.AddRange(Rules);
 
-            var buttonSave = new UICommand() {
+            UICommand buttonSave = new UICommand() {
                 Id = "save",
                 Caption = "Save",
                 Command = new DelegateCommand(() => { vm.ApplyRulesChanges(); }),
@@ -312,7 +308,7 @@ namespace VS
                 IsCancel = false
             };
 
-            var buttonCancel = new UICommand() {
+            UICommand buttonCancel = new UICommand() {
                 Id = "cancel",
                 Caption = "Cancel",
                 Command = new DelegateCommand(() => { }),
@@ -329,43 +325,42 @@ namespace VS
                 viewModel: vm
             );
 
-            if (result != buttonSave) {
+            if(result != buttonSave) {
                 return;
             }
             //update rules so that theme can apply it.
-            this.Rules = vm.Rules.ToList();
+            Rules = new List<MonacoThemeRule>(vm.Rules);
         }
 
 		public bool CanChangeRules() {
-			return this.DialogService != null;
+			return DialogService != null;
         }
 
-            [Command]
+        [Command]
 		public async void RegisterCustomLanguage() {
 
-			if (this.SyntaxEditorService == null) {
+			if(SyntaxEditorService == null) {
 				throw new InvalidOperationException("SyntaxEditorService is not available.");
 			}
 
-			if(this.DialogService == null) {
+			if(DialogService == null) {
 				throw new InvalidOperationException("DialogService is not available.");
-            }	
+            }
 
-			var vm = new CustomLanguageViewModel();
+            CustomLanguageViewModel vm = new CustomLanguageViewModel();
 			vm.Monarch = MyLangMonarch;
 			vm.Configuration = MyLangConfiguration;
 			vm.LanguageId = "MyLang";
-			
-			
-            var buttonSave = new UICommand() {
+
+            UICommand buttonSave = new UICommand() {
                 Id = "save",
                 Caption = "Save",
                 Command = new DelegateCommand(() => { }, () => { return !string.IsNullOrWhiteSpace(vm.LanguageId); }),
 			    IsDefault = true,
                 IsCancel = false
             };
-            
-            var buttonCancel = new UICommand() {
+
+            UICommand buttonCancel = new UICommand() {
                 Id = "cancel",
                 Caption = "Cancel",
                 Command = new DelegateCommand(() => { }),
@@ -382,26 +377,25 @@ namespace VS
                 viewModel: vm
             );
 
-            if (result != buttonSave) {
+            if(result != buttonSave) {
 				return;
             }
 
-
-            var myLang = new LanguageDescriptor {
+            LanguageDescriptor myLang = new LanguageDescriptor {
 				Id = vm.LanguageId,
 				Monarch = vm.Monarch,
 				Configuration = vm.Configuration
 			};
 
-			this.SyntaxEditorService.RegisterLanguage(myLang);
-			await this.RefreshLanguages();
-			this.Language = vm.LanguageId;
+			SyntaxEditorService.RegisterLanguage(myLang);
+			await RefreshLanguages();
+			Language = vm.LanguageId;
 
-            this.Text = testText;
+            Text = testText;
 		}
 
 		public bool CanRegisterCustomLanguage() {
-			return this.DialogService != null && this.SyntaxEditorService != null;
+			return DialogService != null && SyntaxEditorService != null;
         }
 	}
 }
