@@ -306,3 +306,8 @@ TesterMetadata.xml
 
 # Local server for npm packages
 .npmrc
+
+# npm files dependencies
+package-lock.json
+
+.angular/
